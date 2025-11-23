@@ -40,50 +40,49 @@ const App: React.FC = () => {
   }, []);
 
   const handleSendMessage = useCallback(async (text: string) => {
-    if (!text.trim() || !chatRef.current) return;
+  if (!text.trim()) return;
 
-    setIsLoading(true);
-    setError(null);
+  setIsLoading(true);
+  setError(null);
 
-    const userMessage: Message = { role: Role.User, parts: [{ text }] };
-    setMessages(prev => [...prev, userMessage]);
+  try {
+    const res = await fetch("/api/chat", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        message: text,
+      }),
+    });
 
-    // Add a placeholder for the model's response
-    setMessages(prev => [...prev, { role: Role.Model, parts: [{ text: "" }] }]);
+    const data = await res.json();
 
-    try {
-      const stream = await chatRef.current.sendMessageStream({ message: text });
+    setMessages(prev => [
+      ...prev,
+      {
+        role: Role.User,
+        parts: [{ text }],
+      },
+    ]);
 
-      for await (const chunk of stream) {
-        const c = chunk as GenerateContentResponse;
-        const chunkText = c.text;
-        if (chunkText) {
-          setMessages(prev => {
-            const lastMessage = prev[prev.length - 1];
-            if (lastMessage.role === Role.Model) {
-              const updatedParts = [{ text: (lastMessage.parts[0].text || "") + chunkText }];
-              return [...prev.slice(0, -1), { ...lastMessage, parts: updatedParts }];
-            }
-            return prev;
-          });
-        }
-      }
-    } catch (e: any) {
-      console.error("Error sending message:", e);
-      const errorMessage = "Rất tiếc, đã có lỗi xảy ra. Vui lòng thử lại sau.";
-      setError(errorMessage);
-       setMessages(prev => {
-            const lastMessage = prev[prev.length - 1];
-            if (lastMessage.role === Role.Model && lastMessage.parts[0].text === "") {
-               const updatedParts = [{ text: errorMessage }];
-               return [...prev.slice(0, -1), { ...lastMessage, parts: updatedParts }];
-            }
-            return [...prev, {role: Role.Model, parts: [{text: errorMessage}]}];
-        });
-    } finally {
-      setIsLoading(false);
+    if (data.reply) {
+      setMessages(prev => [
+        ...prev,
+        {
+          role: Role.Model,
+          parts: [{ text: data.reply }],
+        },
+      ]);
     }
-  }, []);
+
+  } catch {
+    setError("Server error");
+  } finally {
+    setIsLoading(false);
+  }
+}, []);
+
 
   return (
     <div className="flex flex-col h-screen bg-gray-100 font-sans">
