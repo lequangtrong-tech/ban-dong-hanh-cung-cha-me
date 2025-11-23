@@ -39,50 +39,49 @@ const App: React.FC = () => {
     initChat();
   }, []);
 
-  const handleSendMessage = useCallback(async (text: string) => {
-  if (!text.trim()) return;
+const handleSendMessage = useCallback(async (text: string) => {
+    if (!text.trim()) return;
 
-  setIsLoading(true);
-  setError(null);
+    setIsLoading(true);
+    setError(null);
 
-  try {
-    const res = await fetch("/api/chat", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        message: text,
-      }),
-    });
+    const userMessage: Message = { role: Role.User, parts: [{ text }] };
+    setMessages(prev => [...prev, userMessage]);
 
-    const data = await res.json();
+    try {
+        const res = await fetch("/api/chat", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ message: text })
+        });
 
-    setMessages(prev => [
-      ...prev,
-      {
-        role: Role.User,
-        parts: [{ text }],
-      },
-    ]);
+        const data = await res.json();
 
-    if (data.reply) {
-      setMessages(prev => [
-        ...prev,
-        {
-          role: Role.Model,
-          parts: [{ text: data.reply }],
-        },
-      ]);
+        if (!res.ok) {
+            throw new Error(data.error || "Server error");
+        }
+
+        const botReply: Message = {
+            role: Role.Model,
+            parts: [{ text: data.reply }]
+        };
+
+        setMessages(prev => [...prev, botReply]);
+
+    } catch (e: any) {
+        console.error(e);
+
+        setMessages(prev => [
+            ...prev,
+            { role: Role.Model, parts: [{ text: "Rất tiếc, đã có lỗi xảy ra." }] }
+        ]);
+
+        setError("Rất tiếc, đã có lỗi xảy ra.");
+
+    } finally {
+        setIsLoading(false);
     }
-
-  } catch {
-    setError("Server error");
-  } finally {
-    setIsLoading(false);
-  }
 }, []);
-
 
   return (
     <div className="flex flex-col h-screen bg-gray-100 font-sans">
